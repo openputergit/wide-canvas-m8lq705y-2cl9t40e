@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Translator</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .call-container {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+        }
+        .message-bubble {
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .loading-dots::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .language-badge {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            font-size: 0.6rem;
+        }
+        .voice-wave {
+            display: inline-block;
+            height: 16px;
+            position: relative;
+        }
+        .voice-wave span {
+            display: inline-block;
+            width: 3px;
+            height: 100%;
+            margin: 0 1px;
+            background-color: currentColor;
+            border-radius: 2px;
+            animation: voiceWave 1s infinite ease-in-out;
+        }
+        .voice-wave span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .voice-wave span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        .voice-wave span:nth-child(4) {
+            animation-delay: 0.6s;
+        }
+        @keyframes voiceWave {
+            0%, 100% {
+                height: 30%;
+            }
+            50% {
+                height: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-blue-600 text-white p-4">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-xl font-bold">Real-Time Translator</h1>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center bg-blue-700 rounded-lg px-3 py-1.5">
+                        <span class="text-sm mr-2">My Language:</span>
+                        <select v-model="userLanguage" class="bg-blue-600 text-white px-2 py-1 rounded text-sm focus:outline-none">
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ru">Russian</option>
+                            <option value="ar">Arabic</option>
+                            <option value="hi">Hindi</option>
+                        </select>
+                    </div>
+                    <button class="hover:bg-blue-700 p-2 rounded-full">
+                        <i class="bi bi-gear text-lg"></i>
+                    </button>
+                    <button class="hover:bg-blue-700 p-2 rounded-full">
+                        <i class="bi bi-person-circle text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container mx-auto p-4 flex flex-col md:flex-row gap-4">
+            <!-- Contacts List -->
+            <div class="w-full md:w-1/3 bg-white rounded-lg shadow-md p-4 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Contacts</h2>
+                    <div class="flex space-x-2">
+                        <button class="text-blue-600 hover:text-blue-800">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        <button class="text-blue-600 hover:text-blue-800">
+                            <i class="bi bi-plus-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Contact Filter -->
+                <div class="mb-4">
+                    <div class="flex space-x-2 overflow-x-auto py-1">
+                        <button class="px-3 py-1 bg-blue-500 text-white rounded-full text-sm whitespace-nowrap">
+                            All
+                        </button>
+                        <button class="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm whitespace-nowrap">
+                            Recent
+                        </button>
+                        <button class="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm whitespace-nowrap">
+                            Favorites
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contacts -->
+                <div class="space-y-2 flex-1 overflow-y-auto">
+                    <div v-for="contact in contacts" 
+                         :class="['flex items-center p-2 hover:bg-gray-100 rounded cursor-pointer', 
+                                 selectedContact && selectedContact.name === contact.name ? 'bg-blue-50' : '']"
+                         @click="selectContact(contact)">
+                        <div class="relative">
+                            <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                                {{ contact.name[0] }}
+                            </div>
+                            <span class="language-badge w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center">
+                                {{ contact.language.substring(0, 2) }}
+                            </span>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <div class="font-medium">{{ contact.name }}</div>
+                            <div class="text-xs text-gray-500">{{ contact.language }}</div>
+                        </div>
+                        <div class="text-gray-400 text-xs">
+                            {{ contact.lastSeen }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat/Call Area -->
+            <div class="w-full md:w-2/3 bg-white rounded-lg shadow-md flex flex-col">
+                <div v-if="selectedContact" class="h-full flex flex-col">
+                    <!-- Contact Header -->
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <div class="flex items-center">
+                            <div class="relative">
+                                <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                                    {{ selectedContact.name[0] }}
+                                </div>
+                                <span class="language-badge w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center">
+                                    {{ selectedContact.language.substring(0, 2) }}
+                                </span>
+                            </div>
+                            <div class="ml-3">
+                                <div class="font-medium">{{ selectedContact.name }}</div>
+                                <div class="text-xs flex items-center">
+                                    <span class="inline-block w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                                    <span class="text-gray-500">Online</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button @click="startVideoCall" class="text-blue-600 hover:text-blue-800 p-2 hover:bg-gray-100 rounded-full">
+                                <i class="bi bi-camera-video text-xl"></i>
+                            </button>
+                            <button @click="startVoiceCall" class="text-blue-600 hover:text-blue-800 p-2 hover:bg-gray-100 rounded-full">
+                                <i class="bi bi-telephone text-xl"></i>
+                            </button>
+                            <button class="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Messages Area -->
+                    <div class="flex-1 p-4 overflow-y-auto space-y-4" ref="messagesContainer">
+                        <div v-for="message in messages" 
+                             :class="['flex', message.sent ? 'justify-end' : 'justify-start']">
+                            <div :class="[
+                                'message-bubble rounded-lg p-3',
+                                message.sent ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                            ]">
+                                <div class="flex items-center">
+                                    <span v-if="message.isVoice" class="voice-wave mr-2" :class="message.sent ? 'text-white' : 'text-gray-600'">
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                    </span>
+                                    <div class="text-sm">
+                                        {{ message.text }}
+                                        <span v-if="message.isVoice" class="ml-2 text-xs">
+                                            <i class="bi bi-play-fill"></i> Play
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="text-xs mt-1" :class="message.sent ? 'text-blue-100' : 'text-gray-500'">
+                                    {{ message.translatedText }}
+                                </div>
+                                <div class="text-xs mt-1 text-right" :class="message.sent ? 'text-blue-100' : 'text-gray-400'">
+                                    {{ message.time }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message Input -->
+                    <div class="p-4 border-t">
+                        <div class="flex space-x-2">
+                            <button @click="toggleVoiceInput" 
+                                    :class="['p-2 rounded-full focus:outline-none', 
+                                           isRecording ? 'bg-red-500 text-white pulse' : 'bg-gray-200 text-gray-600']">
+                                <i :class="['bi', isRecording ? 'bi-mic-fill' : 'bi-mic']"></i>
+                            </button>
+                            <input v-model="newMessage" 
+                                   @keyup.enter="sendMessage"
+                                   type="text" 
+                                   placeholder="Type your message..." 
+                                   class="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:border-blue-500">
+                            <button @click="sendMessage" 
+                                    class="bg-blue-500 text-white rounded-full p-2 hover:bg-blue-600 focus:outline-none">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                        <div v-if="isRecording" class="mt-2 text-center text-sm text-red-500">
+                            Recording voice message <span class="loading-dots"></span>
+                        </div>
+                        <div v-if="isTranslating" class="mt-2 text-center text-sm text-blue-500">
+                            Translating <span class="loading-dots"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- No Contact Selected State -->
+                <div v-else class="h-full flex flex-col items-center justify-center text-gray-500 p-6">
+                    <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                        <i class="bi bi-translate text-4xl text-gray-400"></i>
+                    </div>
+                    <h3 class="text-xl font-medium mb-2">Real-Time Translator</h3>
+                    <p class="text-center text-gray-400 max-w-md mb-4">
+                        Select a contact to start chatting. Messages, voice, and video calls will be automatically translated to your preferred language.
+                    </p>
+                    <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 focus:outline-none">
+                        <i class="bi bi-plus-circle mr-2"></i> Add New Contact
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call Modal -->
+        <div v-if="activeCall" 
+             class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+            <div class="call-container w-full max-w-lg rounded-lg shadow-xl p-6 text-white">
+                <div class="text-center">
+                    <div v-if="activeCall.type === 'video'" class="relative w-full mb-4 rounded-lg overflow-hidden aspect-video bg-gray-800 flex items-center justify-center">
+                        <div class="text-gray-400 text-lg">User video feed</div>
+                        <div v-if="!isVideoOff" class="absolute bottom-4 right-4 w-1/3 h-1/3 bg-blue-500 rounded-md flex items-center justify-center">
+                            <span class="text-xs">Your camera</span>
+                        </div>
+                        <div v-else class="absolute bottom-4 right-4 w-1/3 h-1/3 bg-gray-700 rounded-md flex items-center justify-center">
+                            <i class="bi bi-camera-video-off text-lg"></i>
+                        </div>
+                    </div>
+                    <div v-else class="w-24 h-24 rounded-full bg-blue-500 mx-auto flex items-center justify-center text-3xl">
+                        {{ selectedContact?.name[0] }}
+                    </div>
+                    <h3 class="mt-4 text-xl">{{ selectedContact?.name }}</h3>
+                    <p class="text-sm">speaking {{ selectedContact?.language }}</p>
+                    <div v-if="!isMuted" class="mt-4 voice-wave mx-auto text-white">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div class="bg-blue-800 bg-opacity-60 mt-4 p-3 rounded-lg max-w-md mx-auto">
+                        <p class="text-sm"><i class="bi bi-translate mr-1"></i> Real-time translation active</p>
+                        <div v-if="translatedSpeech" class="mt-2 bg-blue-900 p-2 rounded text-sm text-left">
+                            "{{ translatedSpeech }}"
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-center space-x-4 mt-8">
+                    <button @click="toggleMute" 
+                            :class="['w-12 h-12 rounded-full flex items-center justify-center', isMuted ? 'bg-red-500' : 'bg-gray-600']">
+                        <i :class="['bi', isMuted ? 'bi-mic-mute-fill' : 'bi-mic-fill']"></i>
+                    </button>
+                    <button @click="endCall" 
+                            class="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center">
+                        <i class="bi bi-telephone-x-fill text-xl"></i>
+                    </button>
+                    <button @click="toggleVideo" 
+                            v-if="activeCall.type === 'video'"
+                            :class="['w-12 h-12 rounded-full flex items-center justify-center', isVideoOff ? 'bg-red-500' : 'bg-gray-600']">
+                        <i :class="['bi', isVideoOff ? 'bi-camera-video-off-fill' : 'bi-camera-video-fill']"></i>
+                    </button>
+                    <button class="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center">
+                        <i class="bi bi-chat-text-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    userLanguage: 'en',
+                    contacts: [
+                        { name: 'Maria Garcia', language: 'Spanish', lastSeen: '5m ago' },
+                        { name: 'Jean Dupont', language: 'French', lastSeen: '1h ago' },
+                        { name: 'Li Wei', language: 'Chinese', lastSeen: '30m ago' },
+                        { name: 'Hans Schmidt', language: 'German', lastSeen: 'Just now' },
+                        { name: 'Yuki Tanaka', language: 'Japanese', lastSeen: '2h ago' },
+                        { name: 'Amir Khan', language: 'Arabic', lastSeen: 'Yesterday' }
+                    ],
+                    selectedContact: null,
+                    messages: [],
+                    newMessage: '',
+                    activeCall: null,
+                    isMuted: false,
+                    isVideoOff: false,
+                    isRecording: false,
+                    isTranslating: false,
+                    translatedSpeech: '',
+                    translationInterval: null
+                }
+            },
+            methods: {
+                selectContact(contact) {
+                    this.selectedContact = contact
+                    // Simulate loading previous messages
+                    const previousMessages = [
+                        { 
+                            text: 'Hello!', 
+                            translatedText: this.getTranslatedGreeting(contact.language), 
+                            sent: true,
+                            time: '10:05 AM'
+                        },
+                        { 
+                            text: this.getNativeGreeting(contact.language), 
+                            translatedText: 'How are you?', 
+                            sent: false,
+                            time: '10:06 AM'
+                        }
+                    ]
+                    
+                    // Add a voice message example
+                    if (contact.language === 'Spanish') {
+                        previousMessages.push({
+                            text: 'Voice message (0:15)', 
+                            translatedText: 'I was wondering if we could meet tomorrow?',
+                            sent: false,
+                            isVoice: true,
+                            time: '10:15 AM'
+                        })
+                    } else if (contact.language === 'French') {
+                        previousMessages.push({
+                            text: 'Voice message (0:08)', 
+                            translatedText: 'I'll be there in 10 minutes',
+                            sent: true,
+                            isVoice: true,
+                            time: '11:30 AM'
+                        })
+                    }
+                    
+                    this.messages = previousMessages
+                },
+                getNativeGreeting(language) {
+                    const greetings = {
+                        'Spanish': '¡Hola! ¿Cómo estás?',
+                        'French': 'Bonjour! Comment ça va?',
+                        'Chinese': '你好！你好吗？',
+                        'German': 'Hallo! Wie geht es dir?',
+                        'Japanese': 'こんにちは！お元気ですか？',
+                        'Arabic': 'مرحباً! كيف حالك؟',
+                        'Russian': 'Привет! Как дела?',
+                        'Hindi': 'नमस्ते! आप कैसे हैं?'
+                    }
+                    return greetings[language] || 'Hello! How are you?'
+                },
+                getTranslatedGreeting(language) {
+                    const greetings = {
+                        'Spanish': '¡Hola!',
+                        'French': 'Bonjour!',
+                        'Chinese': '你好！',
+                        'German': 'Hallo!',
+                        'Japanese': 'こんにちは！',
+                        'Arabic': 'مرحباً!',
+                        'Russian': 'Привет!',
+                        'Hindi': 'नमस्ते!'
+                    }
+                    return greetings[language] || 'Hello!'
+                },
+                async sendMessage() {
+                    if (!this.newMessage.trim()) return
+
+                    this.isTranslating = true
+                    
+                    // Simulate message translation
+                    const translatedText = await this.translateText(
+                        this.newMessage, 
+                        this.userLanguage, 
+                        this.selectedContact.language.substring(0, 2).toLowerCase()
+                    )
+                    
+                    this.isTranslating = false
+
+                    this.messages.push({
+                        text: this.newMessage,
+                        translatedText: translatedText,
+                        sent: true,
+                        time: this.getCurrentTime()
+                    })
+
+                    this.newMessage = ''
+                    
+                    // Simulate response
+                    setTimeout(() => {
+                        this.receiveMessage()
+                    }, 1500)
+                },
+                async translateText(text, fromLang, toLang) {
+                    // Simulate translation API call with delay
+                    await new Promise(resolve => setTimeout(resolve, 800))
+                    
+                    // Simple mock translations for demo
+                    const translations = {
+                        'es': `Traducido: ${text}`,
+                        'fr': `Traduit: ${text}`,
+                        'de': `Übersetzt: ${text}`,
+                        'zh': `翻译: ${text}`,
+                        'ja': `翻訳: ${text}`,
+                        'ar': `مترجم: ${text}`,
+                        'ru': `Переведено: ${text}`,
+                        'hi': `अनुवादित: ${text}`
+                    }
+                    
+                    return translations[toLang] || `Translated: ${text}`
+                },
+                receiveMessage() {
+                    // Simulate thinking/typing indicator
+                    this.messages.push({
+                        text: '...',
+                        translatedText: '...',
+                        sent: false,
+                        isTyping: true,
+                        time: this.getCurrentTime()
+                    })
+                    
+                    setTimeout(() => {
+                        // Remove typing indicator
+                        this.messages.pop()
+                        
+                        // Get response based on contact language
+                        const responses = this.getResponsesForLanguage(this.selectedContact.language)
+                        const randomResponse = responses[Math.floor(Math.random() * responses.length)]
+                        
+                        this.messages.push({
+                            text: randomResponse.original,
+                            translatedText: randomResponse.translated,
+                            sent: false,
+                            time: this.getCurrentTime()
+                        })
+                    }, 1500)
+                },
+                getResponsesForLanguage(language) {
+                    const responses = {
+                        'Spanish': [
+                            { original: '¡Gracias!', translated: 'Thank you!' },
+                            { original: 'Muy bien, ¿y tú?', translated: 'Very good, and you?' },
+                            { original: '¿Podemos hablar más tarde?', translated: 'Can we talk later?' }
+                        ],
+                        'French': [
+                            { original: 'Merci beaucoup!', translated: 'Thank you very much!' },
+                            { original: 'Je vais bien, et toi?', translated: 'I am well, and you?' },
+                            { original: 'À bientôt!', translated: 'See you soon!' }
+                        ],
+                        'Chinese': [
+                            { original: '谢谢你!', translated: 'Thank you!' },
+                            { original: '我很好，你呢?', translated: 'I am good, and you?' },
+                            { original: '我们明天见!', translated: 'See you tomorrow!' }
+                        ],
+                        'German': [
+                            { original: 'Danke schön!', translated: 'Thank you!' },
+                            { original: 'Mir geht es gut, und dir?', translated: 'I am doing well, and you?' },
+                            { original: 'Bis später!', translated: 'See you later!' }
+                        ],
+                        'Japanese': [
+                            { original: 'ありがとう!', translated: 'Thank you!' },
+                            { original: '元気です、あなたは?', translated: 'I am fine, and you?' },
+                            { original: 'また明日!', translated: 'See you tomorrow!' }
+                        ],
+                        'Arabic': [
+                            { original: 'شكرا جزيلا!', translated: 'Thank you very much!' },
+                            { original: 'أنا بخير، وأنت؟', translated: 'I am fine, and you?' }
+                        ]
+                    }
+                    
+                    return responses[language] || [{ original: 'OK', translated: 'OK' }]
+                },
+                getCurrentTime() {
+                    const now = new Date()
+                    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                },
+                startVideoCall() {
+                    this.activeCall = { type: 'video' }
+                    this.startTranslationSimulation()
+                },
+                startVoiceCall() {
+                    this.activeCall = { type: 'voice' }
+                    this.startTranslationSimulation()
+                },
+                startTranslationSimulation() {
+                    const phrases = [
+                        "Hello, how are you today?",
+                        "I'm calling about our meeting tomorrow",
+                        "Can you hear me clearly with the translation?",
+                        "This real-time translation is amazing",
+                        "Let me know if you have any questions",
+                        "It's great to be able to communicate easily"
+                    ]
+                    
+                    // Simulate translation during call
+                    this.translationInterval = setInterval(() => {
+                        if (!this.isMuted) {
+                            const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)]
+                            this.translatedSpeech = randomPhrase
+                        }
+                    }, 5000)
+                },
+                endCall() {
+                    clearInterval(this.translationInterval)
+                    this.activeCall = null
+                    this.isMuted = false
+                    this.isVideoOff = false
+                    this.translatedSpeech = ''
+                },
+                toggleMute() {
+                    this.isMuted = !this.isMuted
+                    if (this.isMuted) {
+                        this.translatedSpeech = ""
+                    }
+                },
+                toggleVideo() {
+                    this.isVideoOff = !this.isVideoOff
+                },
+                toggleVoiceInput() {
+                    if (this.isRecording) {
+                        // Stop recording and send voice message
+                        this.isRecording = false
+                        this.isTranslating = true
+                        
+                        setTimeout(() => {
+                            this.isTranslating = false
+                            this.messages.push({
+                                text: 'Voice message (0:10)',
+                                translatedText: 'This is a translated voice message',
+                                sent: true,
+                                isVoice: true,
+                                time: this.getCurrentTime()
+                            })
+                            
+                            // Simulate response
+                            setTimeout(() => {
+                                this.receiveMessage()
+                            }, 2000)
+                        }, 1500)
+                    } else {
+                        // Start recording
+                        this.isRecording = true
+                    }
+                }
+            },
+            watch: {
+                messages: {
+                    handler() {
+                        this.$nextTick(() => {
+                            const container = this.$refs.messagesContainer
+                            if (container) {
+                                container.scrollTop = container.scrollHeight
+                            }
+                        })
+                    },
+                    deep: true
+                }
+            },
+            mounted() {
+                // Simulate a response when the app loads
+                setTimeout(() => {
+                    // If a contact is already selected (for demo purposes)
+                    if (this.selectedContact) {
+                        this.receiveMessage()
+                    }
+                }, 3000)
+            }
+        }).mount('#app')
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
